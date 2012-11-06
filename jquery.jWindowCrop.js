@@ -43,33 +43,50 @@
 			base.$frame.find('.jwc_zoom_out').on('click.'+base.namespace, base.zoomOut);
 			base.$frame.on('mouseenter.'+base.namespace, handleMouseEnter);
 			base.$frame.on('mouseleave.'+base.namespace, handleMouseLeave);
-			base.$image.on('load.'+base.namespace, handeImageLoad);
+			base.$image.on('load.'+base.namespace, handleImageLoad);
 			base.$image.on('mousedown.'+base.namespace, handleMouseDown);
 			$(document).on('mousemove.'+base.namespace, handleMouseMove);
 			$(document).on('mouseup.'+base.namespace, handleMouseUp);
 		};
 
 		base.setZoom = function(percent) {
-			if(base.minPercent >= 1) {
-				percent = base.minPercent;
-			} else if(percent > 1.0) {
-				percent = 1;
-			} else if(percent < base.minPercent) {
-				percent = base.minPercent;	
+			// if(base.minPercent >= 2) {
+			// 	percent = base.minPercent;
+			// } else if(percent > 2.0) {
+			// 	percent = 2;
+			// } else if(percent < base.minPercent) {
+			// 	percent = base.minPercent;	
+			// }
+
+			var newWidth = Math.ceil(base.originalWidth*percent);
+			var newHeight = Math.ceil(base.originalHeight*percent);
+
+			if( (newWidth < 20 && newWidth < base.originalWidth) ||
+			 	(newHeight < 20 && newHeight < base.originalHeight) ) {
+				// minimum width/height for zoom
+				return;
 			}
-			base.$image.width(Math.ceil(base.originalWidth*percent));
-			base.$image.height(Math.ceil(base.originalHeight*percent));
+
+			base.$image.width(newWidth);
+			base.$image.height(newHeight);
 			base.workingPercent = percent;
-			focusOnCenter();
+
+			var offset = base.$image.offset();
+			var left = offset.left;
+			var top = offset.top;
+
+			if(left < -newWidth + 10) base.$image.css('left', (-imgWidth + 10) + 'px');
+			if(top < -newHeight + 10) base.$image.css('top', (-imgHeight + 10) + 'px');
+
 			updateResult();
 		};
 		base.zoomIn = function() {
-			var zoomIncrement = (1.0 - base.minPercent) / (base.options.zoomSteps-1);
+			var zoomIncrement = 5.0 / (base.options.zoomSteps-1);
 			base.setZoom(base.workingPercent+zoomIncrement);
 			return false;
 		};
 		base.zoomOut = function() {
-			var zoomIncrement = (1.0 - base.minPercent) / (base.options.zoomSteps-1);
+			var zoomIncrement = 5.0 / (base.options.zoomSteps-1);
 			base.setZoom(base.workingPercent-zoomIncrement);
 			return false;
 		};
@@ -87,7 +104,7 @@
 		};
 		base.destroy = function() {
 			// remove event handlers
-			base.$image.off('load.'+base.namespace, handeImageLoad);
+			base.$image.off('load.'+base.namespace, handleImageLoad);
 			base.$image.off('mousedown.'+base.namespace, handleMouseDown);
 			$(document).off('mousemove.'+base.namespace, handleMouseMove);
 			$(document).off('mouseup.'+base.namespace, handleMouseUp);
@@ -110,32 +127,17 @@
 				base.originalHeight = base.$image.height();
 			}
 			if(base.originalWidth > 0) {
-				// first calculate the "all the way zoomed out" position
-				// this should always still fill the frame so there's no blank space.
-				// this will be the value you're never allowed to get lower than.
-				var widthRatio = base.options.targetWidth / base.originalWidth;
-				var heightRatio = base.options.targetHeight / base.originalHeight;
-				if(widthRatio >= heightRatio) {
-					base.minPercent = (base.originalWidth < base.options.targetWidth) ? (base.options.targetWidth / base.originalWidth) : widthRatio;
-				} else {
-					base.minPercent = (base.originalHeight < base.options.targetHeight) ? (base.options.targetHeight / base.originalHeight) : heightRatio;
-				}
-
 				// now if they've set initial width and height, calculate the
 				// starting zoom percentage. 
-				if (base.options.cropW!==null && base.options.cropW!=='' && base.options.cropH!==null && base.options.cropH!=='') {
-					widthRatio = base.options.targetWidth / base.options.cropW;
-					heightRatio = base.options.targetHeight / base.options.cropH;
-					if(widthRatio >= heightRatio) {
-						var cropPercent = (base.originalWidth < base.options.targetWidth) ? (base.options.targetWidth / base.originalWidth) : widthRatio;
-					} else {
-						var cropPercent = (base.originalHeight < base.options.targetHeight) ? (base.options.targetHeight / base.originalHeight) : heightRatio;
-					}
+				if (base.options.cropW!==null && base.options.cropW!=='' && base.options.cropW !== undefined && base.options.cropH!==null && base.options.cropH!=='' && base.options.cropH !== undefined) {
+					widthRatio = base.options.cropW / base.originalWidth;
+					heightRatio = base.options.cropH / base.originalHeight;
+					var cropPercent = Math.min(widthRatio, heightRatio);
 				}
 				// If they didn't specify anything then use the above "all the
 				// way zoomed out" value.
 				else {
-					var cropPercent = base.minPercent;
+					var cropPercent = 1;
 				}
 
 				// for the initial zoom we'll just jump into the center of the image.
@@ -146,7 +148,10 @@
 				// to the new position after zooming. Why after? because the initial
 				// position might not be valid until after we zoom...
 				if (base.options.cropX!==null && base.options.cropX!=='' && base.options.cropY!==null && base.options.cropY!=='') {
-					base.$image.css({'left' : (Math.floor(parseInt(base.options.cropX)*base.workingPercent*-1)+'px'), 'top' : (Math.floor(parseInt(base.options.cropY)*base.workingPercent*-1)+'px')});
+					base.$image.css({
+						'left' : Math.round(parseFloat(base.options.cropX)) + 'px',
+						'top' : Math.round(parseFloat(base.options.cropY)) + 'px'
+					});
 					storeFocalPoint();
 					// make sure we notify the onChange function about this...
 					updateResult();
@@ -161,23 +166,17 @@
 			var y = (parseInt(base.$image.css('top'))*-1 + base.options.targetHeight/2) / base.workingPercent;
 			base.focalPoint = {'x': Math.round(x), 'y': Math.round(y)};
 		}
-		function focusOnCenter() {
-			var left = fillContainer((Math.round((base.focalPoint.x*base.workingPercent) - base.options.targetWidth/2)*-1), base.$image.width(), base.options.targetWidth);
-			var top = fillContainer((Math.round((base.focalPoint.y*base.workingPercent) - base.options.targetHeight/2)*-1), base.$image.height(), base.options.targetHeight);
-			base.$image.css({'left': (left.toString()+'px'), 'top': (top.toString()+'px')})
-			storeFocalPoint();
-		}
 		function updateResult() {
 			base.result = {
-				cropX: Math.floor(parseInt(base.$image.css('left'))/base.workingPercent*-1),
-				cropY: Math.floor(parseInt(base.$image.css('top'))/base.workingPercent*-1),
-				cropW: Math.round(base.options.targetWidth/base.workingPercent),
-				cropH: Math.round(base.options.targetHeight/base.workingPercent),
-				mustStretch: (base.minPercent > 1)
+				left: Math.round(parseFloat(base.$image.css('left'))),
+				top: Math.round(parseFloat(base.$image.css('top'))),
+				width: Math.round(base.$image.width()),
+				height: Math.round(base.$image.height())
 			};
 			base.options.onChange.call(base.image, base.result);
 		}
-		function handeImageLoad() {
+		function handleImageLoad() {
+			base.$frame.find('.jwc_loading_text').remove();
 			initializeDimensions();
 		}
 		function handleMouseDown(event) {
@@ -191,10 +190,31 @@
 		}
 		function handleMouseMove(event) {
 			if(base.isDragging) {
+				// NEW: 
 				var xDif = event.pageX - base.dragMouseCoords.x;
 				var yDif = event.pageY - base.dragMouseCoords.y;
-				var newLeft = fillContainer((base.dragImageCoords.x + xDif), base.$image.width(), base.options.targetWidth);
-				var newTop = fillContainer((base.dragImageCoords.y + yDif), base.$image.height(), base.options.targetHeight);
+
+				var contWidth = base.options.targetWidth;
+				var contHeight = base.options.targetHeight;
+
+				var imgWidth = base.$image.width();
+				var imgHeight = base.$image.height();
+
+				var newLeft = base.dragImageCoords.x + xDif;
+				var newTop = base.dragImageCoords.y + yDif;
+
+				if(newLeft < -imgWidth + 10) newLeft = -imgWidth + 10;
+				else if(newLeft > contWidth - 10) newLeft = contWidth - 10;
+
+				if(newTop < -imgHeight + 10) newTop = -imgHeight + 10;
+				else if(newTop > contHeight - 36) newTop = contHeight - 36;
+
+				// OLD:
+				// var xDif = event.pageX - base.dragMouseCoords.x;
+				// var yDif = event.pageY - base.dragMouseCoords.y;
+				// var newLeft = base.dragImageCoords.x + xDif;
+				// var newTop = base.dragImageCoords.y + yDif;
+
 				base.$image.css({'left' : (newLeft.toString()+'px'), 'top' : (newTop.toString()+'px')});
 				storeFocalPoint();
 				updateResult();
@@ -213,7 +233,7 @@
 	$.jWindowCrop.defaultOptions = {
 		targetWidth: 320,
 		targetHeight: 180,
-		zoomSteps: 10,
+		zoomSteps: 40,
 		loadingText: 'Loading...',
 		smartControls: true,
 		showControlsOnStart: true,
