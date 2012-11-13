@@ -133,11 +133,18 @@
 					widthRatio = base.options.cropW / base.originalWidth;
 					heightRatio = base.options.cropH / base.originalHeight;
 					var cropPercent = Math.min(widthRatio, heightRatio);
-				}
-				// If they didn't specify anything then use the above "all the
-				// way zoomed out" value.
-				else {
-					var cropPercent = 1;
+					// if(widthRatio >= heightRatio) {
+					// 	var cropPercent = (base.originalWidth < base.options.targetWidth) ? (base.options.targetWidth / base.originalWidth) : widthRatio;
+					// } else {
+					// 	var cropPercent = (base.originalHeight < base.options.targetHeight) ? (base.options.targetHeight / base.originalHeight) : heightRatio;
+					// }
+				} else {
+					// If they didn't specify anything then fit to target
+					widthRatio = base.options.targetWidth / base.originalWidth;
+					heightRatio = base.options.targetHeight / base.originalHeight;
+
+					// average of the fit for width and height, but never zoom it in beyond 1
+					var cropPercent = Math.min((widthRatio + heightRatio) / 2, 1);
 				}
 
 				// for the initial zoom we'll just jump into the center of the image.
